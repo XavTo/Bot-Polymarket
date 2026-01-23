@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { webcrypto } from "crypto";
 import { loadConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { ClobService } from "./clob.js";
@@ -11,6 +12,9 @@ import { nowSec, sleep } from "./utils.js";
 const REDEEM_COOLDOWN_SEC = 600;
 
 const main = async () => {
+  if (!globalThis.crypto) {
+    (globalThis as typeof globalThis & { crypto?: Crypto }).crypto = webcrypto as Crypto;
+  }
   const config = loadConfig();
   const logger = createLogger(config.debug);
   const state = await loadState(config.stateFile);
