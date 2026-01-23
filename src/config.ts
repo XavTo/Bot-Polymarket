@@ -133,7 +133,7 @@ export const loadConfig = (): Config => {
   const chainId = parseNumber("CHAIN_ID", 137);
 
   const privateKey = requireEnv("PRIVATE_KEY");
-  const signatureType = parseNumber("SIGNATURE_TYPE", 0);
+  const signatureType = parseNumber("SIGNATURE_TYPE", 1);
   const profileRaw = getEnv("PROFILE_ADDRESS");
   const funderRaw = getEnv("FUNDER_ADDRESS");
   const derivedAddress = new Wallet(privateKey).address.toLowerCase();

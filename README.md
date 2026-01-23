@@ -59,7 +59,7 @@ These all have defaults in code. Only set them if you want overrides:
 - `CLOB_API_KEY`, `CLOB_API_SECRET`, `CLOB_API_PASSPHRASE`: use if you want to avoid auto‑derivation at startup.
 - `RELAYER_URL` (default: `https://relayer-v2.polymarket.com`): redeem relayer endpoint.
 - `RELAYER_TX_TYPE` (default: `PROXY`): relayer transaction type.
-- `SIGNATURE_TYPE` (default: `0`): wallet signature type.
+- `SIGNATURE_TYPE` (default: `1`): wallet signature type.
 - `FUNDER_ADDRESS`: profile/funder address if needed (otherwise `PROFILE_ADDRESS`).
 
 ## Polymarket address (clear)
