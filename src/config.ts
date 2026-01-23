@@ -1,4 +1,4 @@
-import { Wallet } from "ethers";
+import { Wallet, utils } from "ethers";
 
 export type CopyStrategy = "PERCENT_USD" | "PERCENT_SHARES" | "FIXED_USD" | "FIXED_SHARES";
 export type CopySide = "BUY" | "SELL" | "BOTH";
@@ -52,6 +52,13 @@ export interface Config {
   maxSeenTradesAgeSec: number;
 }
 
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigError";
+  }
+}
+
 const getEnv = (name: string): string | undefined => {
   const val = process.env[name];
   return val === undefined || val === "" ? undefined : val;
@@ -59,7 +66,7 @@ const getEnv = (name: string): string | undefined => {
 
 const requireEnv = (name: string): string => {
   const val = getEnv(name);
-  if (!val) throw new Error(`Missing required env var: ${name}`);
+  if (!val) throw new ConfigError(`Missing required env var: ${name}`);
   return val;
 };
 
@@ -67,10 +74,10 @@ const parseNumber = (name: string, fallback?: number): number => {
   const raw = getEnv(name);
   if (raw === undefined) {
     if (fallback !== undefined) return fallback;
-    throw new Error(`Missing required numeric env var: ${name}`);
+    throw new ConfigError(`Missing required numeric env var: ${name}`);
   }
   const num = Number(raw);
-  if (!Number.isFinite(num)) throw new Error(`Invalid number for ${name}: ${raw}`);
+  if (!Number.isFinite(num)) throw new ConfigError(`Invalid number for ${name}: ${raw}`);
   return num;
 };
 
@@ -96,7 +103,7 @@ const normalizeStrategy = (raw?: string): CopyStrategy => {
   if (["PERCENT_SHARES", "PCT_SHARES"].includes(val)) return "PERCENT_SHARES";
   if (["FIXED", "BRUT", "FIXED_USD", "FLAT_USD"].includes(val)) return "FIXED_USD";
   if (["FIXED_SHARES", "FLAT_SHARES"].includes(val)) return "FIXED_SHARES";
-  throw new Error(`Unsupported COPY_STRATEGY: ${raw}`);
+  throw new ConfigError(`Unsupported COPY_STRATEGY: ${raw}`);
 };
 
 const normalizeSide = (raw?: string): CopySide => {
@@ -104,14 +111,14 @@ const normalizeSide = (raw?: string): CopySide => {
   const val = raw.toUpperCase();
   if (val === "BUY" || val === "SELL") return val;
   if (val === "BOTH" || val === "ALL") return "BOTH";
-  throw new Error(`Unsupported COPY_SIDE: ${raw}`);
+  throw new ConfigError(`Unsupported COPY_SIDE: ${raw}`);
 };
 
 const normalizeTxType = (raw?: string): RelayerTxTypeOption => {
   if (!raw) return "PROXY";
   const val = raw.toUpperCase();
   if (val === "SAFE" || val === "PROXY") return val;
-  throw new Error(`Unsupported RELAYER_TX_TYPE: ${raw}`);
+  throw new ConfigError(`Unsupported RELAYER_TX_TYPE: ${raw}`);
 };
 
 const parseTraderAllocations = (raw?: string): Record<string, number> => {
@@ -127,6 +134,15 @@ const parseTraderAllocations = (raw?: string): Record<string, number> => {
   return out;
 };
 
+const assertAddress = (name: string, value?: string): string | undefined => {
+  if (!value) return undefined;
+  try {
+    return utils.getAddress(value);
+  } catch {
+    throw new ConfigError(`Invalid address for ${name}: ${value}`);
+  }
+};
+
 export const loadConfig = (): Config => {
   const clobHost = getEnv("CLOB_HOST") ?? "https://clob.polymarket.com";
   const dataApiHost = getEnv("DATA_API_HOST") ?? "https://data-api.polymarket.com";
@@ -134,14 +150,14 @@ export const loadConfig = (): Config => {
 
   const privateKey = requireEnv("PRIVATE_KEY");
   const signatureType = parseNumber("SIGNATURE_TYPE", 1);
-  const profileRaw = getEnv("PROFILE_ADDRESS");
-  const funderRaw = getEnv("FUNDER_ADDRESS");
+  const profileRaw = assertAddress("PROFILE_ADDRESS", getEnv("PROFILE_ADDRESS"));
+  const funderRaw = assertAddress("FUNDER_ADDRESS", getEnv("FUNDER_ADDRESS"));
   const derivedAddress = new Wallet(privateKey).address.toLowerCase();
   const profileAddress = (profileRaw ?? funderRaw ?? derivedAddress)?.toLowerCase();
   const funderAddress = (funderRaw ?? profileRaw)?.toLowerCase();
 
   if ((signatureType === 1 || signatureType === 2) && !funderAddress) {
-    throw new Error("FUNDER_ADDRESS or PROFILE_ADDRESS is required for SIGNATURE_TYPE 1 or 2");
+    throw new ConfigError("FUNDER_ADDRESS or PROFILE_ADDRESS is required for SIGNATURE_TYPE 1 or 2");
   }
 
   const apiKey = getEnv("CLOB_API_KEY");
@@ -152,7 +168,10 @@ export const loadConfig = (): Config => {
     : undefined;
 
   const copyTraders = parseList("COPY_TRADERS").map((a) => a.toLowerCase());
-  if (copyTraders.length === 0) throw new Error("COPY_TRADERS is required (comma-separated list)");
+  if (copyTraders.length === 0) throw new ConfigError("COPY_TRADERS is required (comma-separated list)");
+  for (const trader of copyTraders) {
+    assertAddress("COPY_TRADERS", trader);
+  }
 
   const traderAllocations = parseTraderAllocations(getEnv("TRADER_ALLOCATIONS"));
 
@@ -190,15 +209,17 @@ export const loadConfig = (): Config => {
   const rpcUrl = getEnv("RPC_URL");
 
   if (!profileAddress) {
-    throw new Error("PROFILE_ADDRESS or FUNDER_ADDRESS is required to query your positions.");
+    throw new ConfigError("PROFILE_ADDRESS or FUNDER_ADDRESS is required to query your positions.");
   }
 
   if (autoRedeem) {
-    if (!rpcUrl) throw new Error("RPC_URL is required when AUTO_REDEEM=true");
+    if (!rpcUrl) throw new ConfigError("RPC_URL is required when AUTO_REDEEM=true");
     const hasLocalCreds = !!builderCreds;
     const hasRemoteCreds = !!builderSigningUrl && !!builderSigningToken;
     if (!hasLocalCreds && !hasRemoteCreds) {
-      throw new Error("Builder credentials are required when AUTO_REDEEM=true. Provide BUILDER_API_* or BUILDER_SIGNING_*.");
+      throw new ConfigError(
+        "Builder credentials are required when AUTO_REDEEM=true. Provide BUILDER_API_* or BUILDER_SIGNING_*."
+      );
     }
   }
 

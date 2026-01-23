@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { webcrypto } from "crypto";
-import { loadConfig } from "./config.js";
+import { loadConfig, ConfigError } from "./config.js";
 import { createLogger } from "./logger.js";
 import { ClobService } from "./clob.js";
 import { DataApiClient } from "./dataApi.js";
@@ -99,6 +99,10 @@ const main = async () => {
 };
 
 main().catch((err) => {
+  if (err instanceof ConfigError) {
+    console.error(`[config] ${err.message}`);
+    process.exit(0);
+  }
   console.error(err);
   process.exit(1);
 });
