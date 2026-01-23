@@ -2,6 +2,10 @@
 
 Minimal bot that mirrors trades from one or more Polymarket traders, with spend limits and automatic cashout after resolution.
 
+## Deploy on Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/Hiptl-?referralCode=1q5cCO&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 ## Install
 
 ```bash
@@ -45,6 +49,11 @@ To auto‑redeem when a market is resolved:
 2. Create a Builder Profile if needed, then click “+ Create New”.
 3. You’ll get `apiKey`, `secret`, and `passphrase` (keep them private).
 
+#### How to get your PRIVATE_KEY (Magic / email login)
+1. Open `https://reveal.magic.link/polymarket`.
+2. Confirm the warnings and reveal your private key.
+3. Paste it into `PRIVATE_KEY` in your `.env`.
+
 ## Advanced variables (explained, not required in `.env`)
 
 These all have defaults in code. Only set them if you want overrides:
@@ -80,3 +89,11 @@ MAX_POSITION_SIZE_USD=500
 COPY_STRATEGY=PERCENT_USD
 COPY_RATIO=0.25
 ```
+
+## Railway Deployment Notes
+
+Railway makes it easy to host a long‑running bot. Deploy this repo, set env vars, and add a volume:
+
+- Mount a volume at `/data`
+- Set `STATE_FILE=/data/state.json` for persistence
+- Set `RAILPACK_NODE_VERSION=22` to force Node 22
