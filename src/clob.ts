@@ -1,4 +1,10 @@
-import { ApiKeyCreds, ClobClient, OrderType, Side, TickSize } from "@polymarket/clob-client";
+import {
+  ApiKeyCreds,
+  ClobClient,
+  OrderType,
+  Side,
+  TickSize,
+} from "@polymarket/clob-client";
 import { Wallet } from "ethers";
 import { Logger } from "./logger.js";
 
@@ -41,7 +47,7 @@ export class ClobService {
       signer,
       undefined,
       config.signatureType,
-      config.funderAddress
+      config.funderAddress,
     );
 
     let creds = config.apiCreds;
@@ -50,16 +56,16 @@ export class ClobService {
       const derived = await temp.deriveApiKey();
       if (ClobService.isValidCreds(derived)) {
         creds = derived;
-        logger.info("Derived API keys. Consider persisting them to env for faster startup.");
+        logger.info("Derived API keys.");
       } else {
         logger.warn("No existing API keys found, attempting create");
         const created = await temp.createApiKey();
         if (ClobService.isValidCreds(created)) {
           creds = created;
-          logger.info("Created API keys. Consider persisting them to env for faster startup.");
+          logger.info("Created API keys.");
         } else {
           throw new Error(
-            "Unable to create or derive API keys. Check SIGNATURE_TYPE, PRIVATE_KEY, and FUNDER_ADDRESS/PROFILE_ADDRESS."
+            "Unable to create or derive API keys. Check SIGNATURE_TYPE, PRIVATE_KEY, and FUNDER_ADDRESS/PROFILE_ADDRESS.",
           );
         }
       }
@@ -71,7 +77,7 @@ export class ClobService {
       signer,
       creds,
       config.signatureType,
-      config.funderAddress
+      config.funderAddress,
     );
     return new ClobService(client, logger);
   }
@@ -98,7 +104,13 @@ export class ClobService {
     const raw = price * factor;
     const rounded = side === Side.BUY ? Math.floor(raw) : Math.ceil(raw);
     const result = rounded / factor;
-    const decimals = tickSize.includes("0.0001") ? 4 : tickSize.includes("0.001") ? 3 : tickSize.includes("0.01") ? 2 : 1;
+    const decimals = tickSize.includes("0.0001")
+      ? 4
+      : tickSize.includes("0.001")
+        ? 3
+        : tickSize.includes("0.01")
+          ? 2
+          : 1;
     return Number(result.toFixed(decimals));
   }
 
@@ -115,7 +127,11 @@ export class ClobService {
     const size = params.size;
 
     if (size < meta.minOrderSize) {
-      this.logger.warn("Order size below minimum", { tokenId, size, min: meta.minOrderSize });
+      this.logger.warn("Order size below minimum", {
+        tokenId,
+        size,
+        min: meta.minOrderSize,
+      });
       return;
     }
 
@@ -127,7 +143,7 @@ export class ClobService {
         size,
       },
       { tickSize: meta.tickSize, negRisk: meta.negRisk },
-      OrderType.GTC
+      OrderType.GTC,
     );
     if (resp?.error) {
       throw new Error(resp.error);
