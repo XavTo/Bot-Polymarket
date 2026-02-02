@@ -1,21 +1,44 @@
 import "dotenv/config";
 import { webcrypto } from "crypto";
-import { loadConfig, ConfigError } from "./config.js";
+import { loadConfig, ConfigError, type Config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { ClobService } from "./clob.js";
 import { DataApiClient } from "./dataApi.js";
 import { CopyTrader } from "./copyTrader.js";
 import { RedeemService } from "./redeem.js";
-import { loadState, markRedeemAttempt, pruneSeenTrades, saveState } from "./state.js";
+import {
+  loadState,
+  markRedeemAttempt,
+  pruneSeenTrades,
+  saveState,
+} from "./state.js";
 import { nowSec, sleep } from "./utils.js";
 
 const REDEEM_COOLDOWN_SEC = 600;
+const IDLE_SLEEP_MS = 60000;
+
+const idleLoop = async (): Promise<never> => {
+  while (true) {
+    console.log(`Fix configuration and restart the bot...`);
+    await sleep(IDLE_SLEEP_MS);
+  }
+};
 
 const main = async () => {
   if (!globalThis.crypto) {
-    (globalThis as typeof globalThis & { crypto?: Crypto }).crypto = webcrypto as Crypto;
+    (globalThis as typeof globalThis & { crypto?: Crypto }).crypto =
+      webcrypto as Crypto;
   }
-  const config = loadConfig();
+  let config: Config;
+  try {
+    config = loadConfig();
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`[config] ${err.message}`);
+      await idleLoop();
+    }
+    throw err;
+  }
   const logger = createLogger(config.debug);
   const state = await loadState(config.stateFile);
 
@@ -28,7 +51,7 @@ const main = async () => {
       funderAddress: config.funderAddress,
       apiCreds: config.apiCreds,
     },
-    logger
+    logger,
   );
 
   const dataApi = new DataApiClient(config.dataApiHost, logger);
@@ -46,7 +69,7 @@ const main = async () => {
           builderSigningUrl: config.builderSigningUrl,
           builderSigningToken: config.builderSigningToken,
         },
-        logger
+        logger,
       )
     : null;
 
@@ -73,7 +96,10 @@ const main = async () => {
     if (!redeemService) return;
     while (true) {
       try {
-        const positions = await dataApi.getPositions(config.profileAddress, true);
+        const positions = await dataApi.getPositions(
+          config.profileAddress,
+          true,
+        );
         const now = nowSec();
         const eligible = positions.filter((pos) => {
           const last = state.redeemAttempts[pos.conditionId] ?? 0;
@@ -82,7 +108,9 @@ const main = async () => {
 
         if (eligible.length) {
           await redeemService.redeemPositions(eligible);
-          const attemptedConditions = new Set(eligible.map((p) => p.conditionId));
+          const attemptedConditions = new Set(
+            eligible.map((p) => p.conditionId),
+          );
           for (const conditionId of attemptedConditions) {
             markRedeemAttempt(state, conditionId);
           }
@@ -101,7 +129,8 @@ const main = async () => {
 main().catch((err) => {
   if (err instanceof ConfigError) {
     console.error(`[config] ${err.message}`);
-    process.exit(0);
+    void idleLoop();
+    return;
   }
   console.error(err);
   process.exit(1);
